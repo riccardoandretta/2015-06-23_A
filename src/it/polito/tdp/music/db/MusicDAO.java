@@ -3,13 +3,17 @@ package it.polito.tdp.music.db;
 import it.polito.tdp.music.model.Artist;
 import it.polito.tdp.music.model.City;
 import it.polito.tdp.music.model.Country;
+import it.polito.tdp.music.model.CountryPairFrequency;
 import it.polito.tdp.music.model.Listening;
+import it.polito.tdp.music.model.TopArtists;
 import it.polito.tdp.music.model.Track;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Month;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -152,6 +156,112 @@ public class MusicDAO {
 		return listenings ;
 		
 	}
+	
+	public List<TopArtists> getMostListenedArtistFromMonth(Month mese) {
+		
+		final String sql = "SELECT a.id, a.artist, count(l.artistid) as ascolti " + 
+				"FROM listening as l, artist as a " + 
+				"WHERE a.id = l.artistid " + 
+				"AND l.month = ? " + 
+				"GROUP BY l.artistid " + 
+				"ORDER BY ascolti desc LIMIT 20" ;
+		
+		List<TopArtists> artists = new LinkedList<>() ;
+		
+		try {
+			Connection conn = DBConnect.getConnection() ;
+
+			PreparedStatement st = conn.prepareStatement(sql) ;
+			
+			st.setInt(1, mese.getValue());
+			
+			ResultSet res = st.executeQuery() ;
+			
+			while( res.next() ) {
+				artists.add(new TopArtists(res.getInt("a.id"), res.getString("artist"), res.getInt("ascolti"))) ;
+			}
+			
+			conn.close() ;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null ;
+		}
+		
+		return artists ;
+		
+	}
+
+public List<Country> getCountryByTopArtist(TopArtists artist, Month mese) {
+		
+		final String sql = "select distinct country.id, country.country " + 
+				"from listening, country " + 
+				"where artistid = ? " + 
+				"and listening.month = ? " + 
+				"and listening.countryid = country.id" ;
+		
+		List<Country> countries = new LinkedList<>() ;
+		
+		try {
+			Connection conn = DBConnect.getConnection() ;
+
+			PreparedStatement st = conn.prepareStatement(sql) ;
+			
+			st.setInt(1, artist.getArtistId());
+			st.setInt(2, mese.getValue());
+			
+			ResultSet res = st.executeQuery() ;
+			
+			while( res.next() ) {
+				countries.add(new Country(res.getInt("id"), res.getString("country"))) ;
+			}
+			
+			conn.close() ;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null ;
+		}
+		
+		return countries ;
+		
+	}
+
+public List<CountryPairFrequency> getArtistsForCountryPairs(Month m) {
+
+	String sql = "select count(distinct l1.artistid) as cnt, c1.id as country1, c2.id as country2 "
+			+ "from country c1, listening l1, listening l2, country c2 " + "where l1.countryid=c1.id "
+			+ "and l2.countryid=c2.id " + "and l1.artistid=l2.artistid " + "and l1.month=? " + "and l2.month=? "
+			+ "group by c1.id, c2.id";
+
+	List<CountryPairFrequency> list = new ArrayList<>();
+
+	try {
+		Connection conn = DBConnect.getConnection();
+
+		PreparedStatement st = conn.prepareStatement(sql);
+
+		st.setInt(1, m.getValue());
+		st.setInt(2, m.getValue());
+
+		ResultSet rs = st.executeQuery();
+
+		while (rs.next()) {
+			list.add(new CountryPairFrequency(
+					rs.getInt("country1"), 
+					rs.getInt("country2"), 
+					rs.getInt("cnt")));
+		}
+
+		conn.close();
+		return list;
+	} catch (SQLException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+		return null;
+	}
+
+}
 
 
 	
@@ -170,11 +280,11 @@ public class MusicDAO {
 		List<Track> tracks = dao.getAllTracks() ;
 		
 		List<Listening> listenings = dao.getAllListenings() ;
-
-
+		
 
 		System.out.format("Loaded %d countries, %d cities, %d artists, %d tracks, %d listenings\n", 
 				countries.size(), cities.size(), artists.size(), tracks.size(), listenings.size()) ;
+		
 	}
 
 }
